@@ -1,0 +1,155 @@
+<html><head><base href="https://example.com/">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>赤鱲角最高陣風記錄</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f0f0f0;
+    }
+    h1 {
+        color: #333;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        background-color: white;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: left;
+    }
+    th {
+        background-color: #4CAF50;
+        color: white;
+    }
+    tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+    #downloadBtn {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 10px 20px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        border-radius: 5px;
+    }
+    #downloadBtn:hover {
+        background-color: #45a049;
+    }
+    #maxGust {
+        font-size: 24px;
+        font-weight: bold;
+        color: #ff4500;
+        margin-bottom: 20px;
+    }
+</style>
+</head>
+<body>
+<h1>赤鱲角最高陣風記錄</h1>
+<div id="maxGust"></div>
+<table id="windTable">
+    <thead>
+        <tr>
+            <th>日期時間</th>
+            <th>自動氣象站</th>
+            <th>風向</th>
+            <th>平均風速</th>
+            <th>最高陣風</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<button id="downloadBtn" onclick="exportTableToCSV()">下載</button>
+
+<script>
+let windData = [];
+const maxRecords = 450;
+
+function fetchData() {
+    fetch('https://res.data.gov.hk/api/get-download-file?name=https%3A%2F%2Fdata.weather.gov.hk%2FweatherAPI%2Fhko_data%2Fregional-weather%2Flatest_10min_wind_uc.csv')
+        .then(response => response.text())
+        .then(data => {
+            const rows = data.split('\n');
+            const headers = rows[0].split(',');
+            const chekLapKokData = rows.find(row => row.includes('赤鱲角'));
+            
+            if (chekLapKokData) {
+                const values = chekLapKokData.split(',');
+                const record = {
+                    datetime: values[0],
+                    station: '赤鱲角',
+                    windDirection: values[2],
+                    avgWindSpeed: values[3],
+                    maxGust: values[4]
+                };
+
+                windData.unshift(record);
+                if (windData.length > maxRecords) {
+                    windData.pop();
+                }
+
+                updateTable();
+                updateMaxGust();
+            }
+        });
+}
+
+function updateTable() {
+    const tbody = document.querySelector('#windTable tbody');
+    tbody.innerHTML = '';
+    windData.forEach(record => {
+        const row = tbody.insertRow();
+        Object.values(record).forEach(value => {
+            const cell = row.insertCell();
+            cell.textContent = value;
+        });
+    });
+}
+
+function updateMaxGust() {
+    const validGusts = windData
+        .map(record => record.maxGust)
+        .filter(gust => gust !== 'N/A' && !isNaN(parseFloat(gust)))
+        .map(gust => parseFloat(gust));
+
+    if (validGusts.length > 0) {
+        const maxGust = Math.max(...validGusts);
+        document.getElementById('maxGust').textContent = `最高陣風記錄: ${maxGust.toFixed(1)} 公里/小時`;
+    } else {
+        document.getElementById('maxGust').textContent = '最高陣風記錄: 暫無有效數據';
+    }
+}
+
+function exportTableToCSV() {
+    let csv = 'data:text/csv;charset=utf-8,\uFEFF';
+    csv += "日期時間,自動氣象站,風向,平均風速,最高陣風\n";
+    
+    windData.forEach(record => {
+        csv += Object.values(record).join(',') + "\n";
+    });
+
+    const encodedUri = encodeURI(csv);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "赤鱲角風力數據.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Fetch data every 10 minutes
+fetchData();
+setInterval(fetchData, 600000);
+</script>
+</body>
+</html>
